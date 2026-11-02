@@ -1,0 +1,22 @@
+image: python:3.13
+
+stages:
+  - test
+
+api-tests:
+  stage: test
+  script:
+    - python -m pip install -r requirements-dev.txt
+    - python manage.py check
+    - python manage.py makemigrations --check --dry-run
+    - python -m pytest --cov=contacts --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - htmlcov/
