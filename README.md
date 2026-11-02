@@ -14,7 +14,9 @@ git checkout -b prenom-nom   # ex: jean-dupont, sans accents, minuscules
 ```
 
 Pour chaque feature ou tâche, crée une sous-branche :
+
 ```bash
+
 git checkout -b prenom-nom/feature/nom-feature
 # ... travail ...
 git checkout prenom-nom
