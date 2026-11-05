@@ -4,3 +4,7 @@ __pycache__/
 .coverage
 coverage.xml
 htmlcov/
+.env
+.venv/
+env/
+contacts.db

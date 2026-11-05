@@ -1,5 +1,4 @@
 [run]
+source = contacts
 omit =
-    contacts/tests.py
-    contacts/test_*.py
-    contacts/migrations/*
+    contacts/__init__.py

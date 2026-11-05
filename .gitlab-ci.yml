@@ -5,10 +5,17 @@ stages:
 
 api-tests:
   stage: test
+  variables:
+    DB_URL: "postgresql+psycopg://postgres:postgres@postgres:5432/contacts"
+    POSTGRES_DB: contacts
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
   script:
     - python -m pip install -r requirements-dev.txt
-    - python manage.py check
-    - python manage.py makemigrations --check --dry-run
+    - alembic upgrade head
     - python -m pytest --cov=contacts --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=html:htmlcov
   coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
   artifacts:

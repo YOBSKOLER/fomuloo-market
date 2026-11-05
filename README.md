@@ -1,49 +1,111 @@
-# Formuloo Market
+# S2 — API REST : Gestionnaire de Contacts
 
-**Parcours** : Formuloo Backend  
-**Niveau** : N3 — Licence  
-**Branche de livraison** : ta branche `prenom-nom`
+API REST de carnet d'adresses professionnel, réalisée avec FastAPI, Pydantic,
+SQLAlchemy et Alembic. L'interface Swagger est disponible sur `/docs`.
 
-## Convention de branchement — OBLIGATOIRE
+## Prérequis et installation
 
-```bash
-git clone https://gitlab.formuloo.com/formuloo-backend/formuloo-market.git
-git checkout develop
-git pull origin develop
-git checkout -b prenom-nom   # ex: jean-dupont, sans accents, minuscules
+Python 3.11 ou supérieur et une base SQLite locale ou PostgreSQL.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt
+Copy-Item .env.example .env
+alembic upgrade head
+uvicorn contacts.main:app --reload
 ```
 
-Pour chaque feature ou tâche, crée une sous-branche :
+Le serveur écoute sur `http://127.0.0.1:8000`; Swagger UI se trouve à
+`http://127.0.0.1:8000/docs`. Le fichier `.env` est local et ne doit pas être commité.
+La valeur par défaut `DB_URL=sqlite:///./contacts.db` permet de démarrer sans serveur
+externe.
 
-```bash
+Pour PostgreSQL, remplacer `DB_URL` dans `.env`, par exemple :
 
-git checkout -b prenom-nom/feature/nom-feature
-# ... travail ...
-git checkout prenom-nom
-git merge prenom-nom/feature/nom-feature
-git push origin prenom-nom
+```dotenv
+DB_URL=postgresql+psycopg://contacts_user:mot_de_passe@localhost:5432/contacts
 ```
 
-**Ta branche `prenom-nom` est ta branche de livraison — c'est ce qui sera évalué.**  
-Ne jamais pousser directement sur `develop` ou `main`.
+Créer la base et son utilisateur PostgreSQL au préalable, puis exécuter
+`alembic upgrade head`. Ne jamais placer un secret réel dans le dépôt.
 
-## Livrable de formation S2 — Django REST Framework
+## Modèle Contact
 
-Le projet inclut une API d'exercice de gestion de contacts dans l'app `contacts` :
-CRUD authentifié par JWT, isolation des données par utilisateur, validation via
-serializer DRF et tests API. Les notes, commandes de démarrage et le lien avec le
-mini-projet sont dans [docs/formation-django-drf.md](docs/formation-django-drf.md).
+| Champ | Type | Règle |
+| --- | --- | --- |
+| `id` | UUID | Clé primaire générée par l'API |
+| `nom` | string | Obligatoire, 1–100 caractères |
+| `prenom` | string | Facultatif |
+| `email` | email | Obligatoire, valide et unique |
+| `telephone` | string | Facultatif |
+| `entreprise` | string | Facultatif |
+| `groupe` | enum | `CLIENT`, `PARTENAIRE`, `FOURNISSEUR`, `AUTRE` |
+| `notes` | text | Facultatif |
+| `created_at`, `updated_at` | datetime | Gérées par la base |
 
-SQLite est configuré par défaut pour le démarrage local. Les variables de configuration
-PostgreSQL sont documentées dans les notes de formation. Le pipeline GitLab exécute
-les contrôles Django, vérifie l'état des migrations et lance les tests pytest avec
-rapport de couverture.
+## Endpoints
 
-Les notes du ticket T3 sur la validation DRF, le format d'erreur API et les protections
-de sécurité de base sont dans [docs/formation-validation-erreurs-securite.md](docs/formation-validation-erreurs-securite.md).
-Les routes d'inscription, de profil et les rôles JWT du ticket T2 sont documentés dans
-[docs/formation-postgresql-jwt.md](docs/formation-postgresql-jwt.md).
+Les erreurs de validation retournent `422`; ressource absente : `404`; email déjà
+utilisé : `400`. Les entrées invalides sont refusées avant enregistrement.
 
-La suite pytest, le rapport pytest-cov, le pipeline GitLab CI et leur réinvestissement
-dans le mini-projet Contacts sont documentés dans
-[docs/formation-tests-api-ci.md](docs/formation-tests-api-ci.md).
+| Méthode | Route | Description |
+| --- | --- | --- |
+| `POST` | `/contacts` | Créer un contact (`201`) |
+| `GET` | `/contacts?page=1&limit=10` | Liste paginée |
+| `GET` | `/contacts/search?q=ada` | Recherche nom, prénom, email ou groupe |
+| `GET` | `/contacts/{id}` | Lire un contact |
+| `PUT` | `/contacts/{id}` | Remplacer le contact |
+| `PATCH` | `/contacts/{id}` | Modifier certains champs |
+| `DELETE` | `/contacts/{id}` | Supprimer (`204`) |
+
+Exemples cURL (PowerShell peut aussi utiliser `curl.exe`) :
+
+```bash
+curl -X POST http://127.0.0.1:8000/contacts \
+  -H "Content-Type: application/json" \
+  -d '{"nom":"Lovelace","prenom":"Ada","email":"ada@example.com","entreprise":"Analytical Engines","groupe":"CLIENT"}'
+
+curl "http://127.0.0.1:8000/contacts?page=1&limit=10"
+curl "http://127.0.0.1:8000/contacts/search?q=ada"
+curl http://127.0.0.1:8000/contacts/UUID_DU_CONTACT
+
+curl -X PUT http://127.0.0.1:8000/contacts/UUID_DU_CONTACT \
+  -H "Content-Type: application/json" \
+  -d '{"nom":"King","prenom":"Ada","email":"ada@example.com","groupe":"PARTENAIRE"}'
+
+curl -X PATCH http://127.0.0.1:8000/contacts/UUID_DU_CONTACT \
+  -H "Content-Type: application/json" \
+  -d '{"telephone":"+33123456789"}'
+
+curl -X DELETE http://127.0.0.1:8000/contacts/UUID_DU_CONTACT
+```
+
+## Tests et intégration continue
+
+```powershell
+python -m pytest --cov=contacts --cov-report=term-missing --cov-report=html
+```
+
+Les tests utilisent `pytest`, `httpx` et `FastAPI TestClient`, avec une base SQLite
+temporaire. Le pipeline GitLab lance Alembic sur PostgreSQL puis les tests avec rapports
+Cobertura XML et HTML.
+
+## Migrations
+
+```powershell
+alembic upgrade head
+alembic revision --autogenerate -m "description du changement"
+alembic downgrade -1
+```
+
+Relire toujours une migration autogénérée avant de la committer.
+
+## Historique des formations Django
+
+Les documents `docs/formation-*.md` des tickets T1 à T4 gardent les notes des exercices
+Django REST Framework antérieurs. Ils décrivent une formation distincte; l'API active du
+mini-projet S2 est l'implémentation FastAPI décrite dans ce README.
+
+La migration du prototype Django vers la stack FastAPI et son impact sur les tests sont
+décrits dans [docs/mini-projet-fastapi.md](docs/mini-projet-fastapi.md).

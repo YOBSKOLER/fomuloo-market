@@ -1,30 +1,50 @@
-from django.conf import settings
-from django.db import models
+import enum
+import uuid
+from datetime import datetime
+
+from sqlalchemy import DateTime, Enum, String, Text, Uuid, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
-class Contact(models.Model):
-    owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="contacts",
+class Base(DeclarativeBase):
+    pass
+
+
+class ContactGroup(str, enum.Enum):
+    CLIENT = "CLIENT"
+    PARTENAIRE = "PARTENAIRE"
+    FOURNISSEUR = "FOURNISSEUR"
+    AUTRE = "AUTRE"
+
+
+class Contact(Base):
+    __tablename__ = "contacts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    nom: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    prenom: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    email: Mapped[str] = mapped_column(
+        String(320), nullable=False, unique=True, index=True
     )
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    email = models.EmailField()
-    phone = models.CharField(max_length=30, blank=True)
-    company = models.CharField(max_length=150, blank=True)
-    notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ("last_name", "first_name", "id")
-        constraints = [
-            models.UniqueConstraint(
-                fields=("owner", "email"),
-                name="unique_contact_email_per_owner",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+    telephone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    entreprise: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    groupe: Mapped[ContactGroup] = mapped_column(
+        Enum(
+            ContactGroup,
+            name="contact_group",
+            values_callable=lambda members: [member.value for member in members],
+        ),
+        nullable=False,
+        default=ContactGroup.AUTRE,
+        index=True,
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
