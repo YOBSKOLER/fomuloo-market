@@ -1,5 +1,8 @@
 # Formation — Django et Django REST Framework
 
+> Note historique de formation. Le mini-projet Contacts actif utilise maintenant FastAPI,
+> SQLAlchemy et Alembic; voir `README.md` et `docs/mini-projet-fastapi.md`.
+
 ## Objectifs et ressources
 
 Cette synthèse sert de support de révision pour le sprint S2. Elle accompagne les

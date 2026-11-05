@@ -1,5 +1,8 @@
 # Formation S2 — PostgreSQL et authentification JWT
 
+> Note historique de formation. L'API du mini-projet Contacts est actuellement publique,
+> selon le périmètre FastAPI de la fiche; le JWT ci-dessous décrit l'exercice antérieur.
+
 ## Objectifs et ressources
 
 Cette synthèse accompagne les ressources du ticket T2 ; elle ne prétend pas prouver

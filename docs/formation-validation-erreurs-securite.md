@@ -1,5 +1,8 @@
 # Formation S2 — Validation, erreurs et sécurité de base
 
+> Note historique de formation sur Django REST Framework. L'API mini-projet active utilise
+> FastAPI et ses erreurs de validation Pydantic; voir `docs/mini-projet-fastapi.md`.
+
 ## Objectifs et ressources
 
 Cette synthèse accompagne les ressources du ticket T3 ; elle ne prétend pas prouver

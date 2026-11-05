@@ -1,5 +1,9 @@
 # Formation S2 — Tests API et intégration continue
 
+> Archive du livrable de formation T4 sur Django REST Framework. Le mini-projet actif
+> a depuis été porté vers FastAPI; ses tests actuels se trouvent dans `tests/`.
+> Les exercices décrits ci-dessous restent la trace du travail de formation initial.
+
 ## Objectifs et ressources
 
 Cette synthèse accompagne les documentations citées dans le ticket T4. Elle ne prétend
