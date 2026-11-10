@@ -1,5 +1,6 @@
-import uuid
+﻿import uuid
 from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from .models import ContactGroup
@@ -60,8 +61,20 @@ class ContactRead(BaseModel):
     updated_at: datetime
 
 
+class ContactReadV2(ContactRead):
+    nom_complet: str
+
+
 class ContactPage(BaseModel):
     items: list[ContactRead]
+    total: int
+    page: int
+    limit: int
+    pages: int
+
+
+class ContactPageV2(BaseModel):
+    items: list[ContactReadV2]
     total: int
     page: int
     limit: int

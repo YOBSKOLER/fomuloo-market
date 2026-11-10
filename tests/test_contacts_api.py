@@ -28,8 +28,8 @@ def test_root_openapi_documents_contact_endpoints(client):
     response = client.get("/openapi.json")
 
     assert response.status_code == 200
-    assert "/contacts" in response.json()["paths"]
-    assert "/contacts/search" in response.json()["paths"]
+    assert "/api/v1/contacts" in response.json()["paths"]
+    assert "/api/v1/contacts/search" in response.json()["paths"]
 
 
 def test_docs_page_is_available(client):
@@ -126,7 +126,7 @@ def test_duplicate_email_returns_400(client):
     response = create_contact(client, nom="Autre", prenom="Personne")
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Un contact utilise déjà cette adresse e-mail."
+    assert response.json()["detail"] == "Un contact utilise d\u00e9j\u00e0 cette adresse e-mail."
 
 
 def test_duplicate_email_is_case_insensitive(client):

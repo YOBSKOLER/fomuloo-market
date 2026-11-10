@@ -1,4 +1,4 @@
-import enum
+﻿import enum
 import uuid
 from datetime import datetime
 
@@ -46,3 +46,7 @@ class Contact(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    @property
+    def nom_complet(self) -> str:
+        return " ".join(part for part in (self.prenom, self.nom) if part)

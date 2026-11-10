@@ -1,11 +1,12 @@
-# S2 — API REST : Gestionnaire de Contacts
+﻿# S2 — API REST : Gestionnaire de Contacts
 
 API REST de carnet d'adresses professionnel, réalisée avec FastAPI, Pydantic,
-SQLAlchemy et Alembic. L'interface Swagger est disponible sur `/docs`.
+SQLAlchemy et Alembic. L'API est versionnée (`/api/v1` et `/api/v2`) et documentée par
+OpenAPI/Swagger.
 
-## Prérequis et installation
+## Installation et démarrage
 
-Python 3.11 ou supérieur et une base SQLite locale ou PostgreSQL.
+Prérequis : Python 3.11 ou supérieur et SQLite (local) ou PostgreSQL.
 
 ```powershell
 python -m venv .venv
@@ -13,22 +14,26 @@ python -m venv .venv
 python -m pip install -r requirements-dev.txt
 Copy-Item .env.example .env
 alembic upgrade head
-uvicorn contacts.main:app --reload
+python -m uvicorn contacts.main:app --reload
 ```
 
-Le serveur écoute sur `http://127.0.0.1:8000`; Swagger UI se trouve à
-`http://127.0.0.1:8000/docs`. Le fichier `.env` est local et ne doit pas être commité.
-La valeur par défaut `DB_URL=sqlite:///./contacts.db` permet de démarrer sans serveur
-externe.
+L'API locale est à `http://127.0.0.1:8000`. Swagger UI est sur
+`http://127.0.0.1:8000/docs`, ReDoc sur `/redoc` et le schéma OpenAPI JSON sur
+`/openapi.json`. Le fichier `.env` est local et ne doit pas être commité. Par défaut,
+`DB_URL=sqlite:///./contacts.db` permet de démarrer sans serveur externe.
 
-Pour PostgreSQL, remplacer `DB_URL` dans `.env`, par exemple :
+Pour PostgreSQL, configurer `DB_URL` dans `.env`, créer au préalable la base et son
+utilisateur, puis appliquer `alembic upgrade head`. Ne jamais commiter un vrai secret.
 
-```dotenv
-DB_URL=postgresql+psycopg://contacts_user:mot_de_passe@localhost:5432/contacts
-```
+## Versions et contrat
 
-Créer la base et son utilisateur PostgreSQL au préalable, puis exécuter
-`alembic upgrade head`. Ne jamais placer un secret réel dans le dépôt.
+- **v1 stable** : `http://127.0.0.1:8000/api/v1/contacts` et `/api/v1/contacts/search`.
+  Les réponses conservent les champs historiques.
+- **v2** : mêmes opérations sous `/api/v2`, avec `nom_complet` ajouté aux réponses.
+- Les anciens chemins `/contacts...` restent des alias temporaires, absents du schéma
+  Swagger; les nouveaux clients doivent utiliser une version explicite.
+
+Voir le [changelog](CHANGELOG.md) et les [notes S3 sur Swagger et le versioning](docs/formation-swagger-versioning.md).
 
 ## Modèle Contact
 
@@ -42,44 +47,36 @@ Créer la base et son utilisateur PostgreSQL au préalable, puis exécuter
 | `entreprise` | string | Facultatif |
 | `groupe` | enum | `CLIENT`, `PARTENAIRE`, `FOURNISSEUR`, `AUTRE` |
 | `notes` | text | Facultatif |
-| `created_at`, `updated_at` | datetime | Gérées par la base |
+| `created_at`, `updated_at` | datetime | Générés par le serveur |
 
-## Endpoints
+## Endpoints disponibles dans v1 et v2
 
-Les erreurs de validation retournent `422`; ressource absente : `404`; email déjà
-utilisé : `400`. Les entrées invalides sont refusées avant enregistrement.
-
-| Méthode | Route | Description |
+| Méthode | Route suffix | Description |
 | --- | --- | --- |
-| `POST` | `/contacts` | Créer un contact (`201`) |
+| `POST` | `/contacts` | Créer (`201`) |
 | `GET` | `/contacts?page=1&limit=10` | Liste paginée |
 | `GET` | `/contacts/search?q=ada` | Recherche nom, prénom, email ou groupe |
-| `GET` | `/contacts/{id}` | Lire un contact |
+| `GET` | `/contacts/{id}` | Lire par UUID |
 | `PUT` | `/contacts/{id}` | Remplacer le contact |
 | `PATCH` | `/contacts/{id}` | Modifier certains champs |
 | `DELETE` | `/contacts/{id}` | Supprimer (`204`) |
 
-Exemples cURL (PowerShell peut aussi utiliser `curl.exe`) :
+Préfixer chaque route par `/api/v1` ou `/api/v2`. Les erreurs de validation retournent
+`422`, un contact absent `404`, un email déjà utilisé `400`, et une erreur imprévue `500`.
 
-```bash
-curl -X POST http://127.0.0.1:8000/contacts \
-  -H "Content-Type: application/json" \
+Exemple de création (remplacer `v1` par `v2` pour la nouvelle version) :
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/api/v1/contacts `
+  -H "Content-Type: application/json" `
   -d '{"nom":"Lovelace","prenom":"Ada","email":"ada@example.com","entreprise":"Analytical Engines","groupe":"CLIENT"}'
 
-curl "http://127.0.0.1:8000/contacts?page=1&limit=10"
-curl "http://127.0.0.1:8000/contacts/search?q=ada"
-curl http://127.0.0.1:8000/contacts/UUID_DU_CONTACT
-
-curl -X PUT http://127.0.0.1:8000/contacts/UUID_DU_CONTACT \
-  -H "Content-Type: application/json" \
-  -d '{"nom":"King","prenom":"Ada","email":"ada@example.com","groupe":"PARTENAIRE"}'
-
-curl -X PATCH http://127.0.0.1:8000/contacts/UUID_DU_CONTACT \
-  -H "Content-Type: application/json" \
-  -d '{"telephone":"+33123456789"}'
-
-curl -X DELETE http://127.0.0.1:8000/contacts/UUID_DU_CONTACT
+curl.exe "http://127.0.0.1:8000/api/v1/contacts?page=1&limit=10"
+curl.exe "http://127.0.0.1:8000/api/v2/contacts/search?q=ada"
 ```
+
+Les essais interactifs, paramètres, schémas de requête et réponses sont aussi accessibles
+sur `/docs`.
 
 ## Tests et intégration continue
 
@@ -87,11 +84,11 @@ curl -X DELETE http://127.0.0.1:8000/contacts/UUID_DU_CONTACT
 python -m pytest --cov=contacts --cov-report=term-missing --cov-report=html
 ```
 
-Les tests utilisent `pytest`, `httpx` et `FastAPI TestClient`, avec une base SQLite
-temporaire. Le pipeline GitLab lance Alembic sur PostgreSQL puis les tests avec rapports
-Cobertura XML et HTML.
+Les tests utilisent `pytest` et `FastAPI TestClient`, avec une base SQLite temporaire. Le
+pipeline GitLab applique Alembic sur PostgreSQL, lance les tests et conserve les rapports
+Cobertura XML/HTML.
 
-## Migrations
+## Migrations Alembic
 
 ```powershell
 alembic upgrade head
@@ -99,13 +96,10 @@ alembic revision --autogenerate -m "description du changement"
 alembic downgrade -1
 ```
 
-Relire toujours une migration autogénérée avant de la committer.
+Relire chaque migration autogénérée avant de la committer.
 
 ## Historique des formations Django
 
 Les documents `docs/formation-*.md` des tickets T1 à T4 gardent les notes des exercices
-Django REST Framework antérieurs. Ils décrivent une formation distincte; l'API active du
-mini-projet S2 est l'implémentation FastAPI décrite dans ce README.
-
-La migration du prototype Django vers la stack FastAPI et son impact sur les tests sont
-décrits dans [docs/mini-projet-fastapi.md](docs/mini-projet-fastapi.md).
+antérieurs en Django REST Framework. Ils ne décrivent pas la stack active du mini-projet;
+voir la [note sur le portage FastAPI](docs/mini-projet-fastapi.md).
