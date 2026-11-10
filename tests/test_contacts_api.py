@@ -1,6 +1,10 @@
 from uuid import UUID
 
 import pytest
+from fastapi.testclient import TestClient
+
+from contacts.db import get_db
+from contacts.main import app
 
 
 def contact_payload(**overrides):
@@ -33,6 +37,25 @@ def test_docs_page_is_available(client):
 
     assert response.status_code == 200
     assert "Swagger UI" in response.text
+
+
+@pytest.mark.usefixtures("client")
+def test_unexpected_error_returns_generic_json_500():
+    previous_override = app.dependency_overrides[get_db]
+
+    def broken_database():
+        raise RuntimeError("internal diagnostic")
+
+    app.dependency_overrides[get_db] = broken_database
+    try:
+        with TestClient(app, raise_server_exceptions=False) as test_client:
+            response = test_client.get("/contacts")
+    finally:
+        app.dependency_overrides[get_db] = previous_override
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Une erreur interne est survenue."}
+    assert "internal diagnostic" not in response.text
 
 
 def test_create_contact_returns_201_and_generated_fields(client):
@@ -104,6 +127,14 @@ def test_duplicate_email_returns_400(client):
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Un contact utilise déjà cette adresse e-mail."
+
+
+def test_duplicate_email_is_case_insensitive(client):
+    create_contact(client)
+
+    response = create_contact(client, email="ADA@EXAMPLE.COM")
+
+    assert response.status_code == 400
 
 
 def test_list_contacts_returns_empty_page_for_empty_database(client):

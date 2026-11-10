@@ -22,8 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled API error for %s %s", request.method, request.url.path)
+async def unhandled_exception_handler(request: Request, _exc: Exception) -> JSONResponse:
+    logger.error(
+        "Unhandled API error for %s %s",
+        request.method,
+        request.url.path,
+        exc_info=(_exc.__class__, _exc, _exc.__traceback__),
+    )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Une erreur interne est survenue."},

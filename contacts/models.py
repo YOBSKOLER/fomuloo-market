@@ -23,9 +23,7 @@ class Contact(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     nom: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     prenom: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    email: Mapped[str] = mapped_column(
-        String(320), nullable=False, unique=True, index=True
-    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
     telephone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     entreprise: Mapped[str | None] = mapped_column(String(150), nullable=True)
     groupe: Mapped[ContactGroup] = mapped_column(

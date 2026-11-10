@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from .models import ContactGroup
 
@@ -13,6 +13,11 @@ class ContactCreate(BaseModel):
     entreprise: str | None = Field(default=None, max_length=150)
     groupe: ContactGroup = ContactGroup.AUTRE
     notes: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value).lower()
 
 
 class ContactUpdate(ContactCreate):
@@ -27,6 +32,11 @@ class ContactPatch(BaseModel):
     entreprise: str | None = Field(default=None, max_length=150)
     groupe: ContactGroup | None = None
     notes: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: EmailStr | None) -> str | None:
+        return str(value).lower() if value is not None else None
 
     @model_validator(mode="after")
     def require_at_least_one_field(self) -> "ContactPatch":
@@ -60,4 +70,3 @@ class ContactPage(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str | list[dict[str, object]]
-
