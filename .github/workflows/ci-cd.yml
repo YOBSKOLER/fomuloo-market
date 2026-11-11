@@ -2,9 +2,20 @@ name: CI/CD
 
 on:
   push:
+    branches:
+      - "**"
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environnement à déployer manuellement depuis main
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
 
 permissions:
   contents: read
@@ -45,13 +56,19 @@ jobs:
           path: coverage.xml
           if-no-files-found: ignore
 
-  deploy:
-    name: Deploy to AWS Elastic Beanstalk
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  deploy-staging:
+    name: Deploy to AWS Elastic Beanstalk (staging)
+    if: >-
+      needs.lint.result == 'success' &&
+      needs.test.result == 'success' &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'staging' &&
+      github.ref == 'refs/heads/main'))
     needs:
       - lint
       - test
     runs-on: ubuntu-latest
+    environment: staging
     permissions:
       contents: read
       id-token: write
@@ -59,6 +76,9 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       EB_APPLICATION_NAME: ${{ vars.EB_APPLICATION_NAME }}
       EB_ENVIRONMENT_NAME: ${{ vars.EB_ENVIRONMENT_NAME }}
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - name: Configure AWS credentials with OIDC
@@ -88,3 +108,70 @@ jobs:
           aws elasticbeanstalk wait environment-updated \
             --environment-names "${EB_ENVIRONMENT_NAME}" \
             --version-label "${VERSION_LABEL}"
+      - name: Verify staging health
+        run: |
+          set -euo pipefail
+          ENVIRONMENT_URL="$(aws elasticbeanstalk describe-environments \
+            --environment-names "${EB_ENVIRONMENT_NAME}" \
+            --query 'Environments[0].CNAME' --output text)"
+          curl --fail --show-error --silent --retry 12 --retry-delay 10 \
+            --retry-all-errors "http://${ENVIRONMENT_URL}/health/ready"
+
+  deploy-production:
+    name: Deploy to AWS Elastic Beanstalk (production)
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.target == 'production' &&
+      github.ref == 'refs/heads/main'
+    needs:
+      - lint
+      - test
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      EB_APPLICATION_NAME: ${{ vars.EB_APPLICATION_NAME }}
+      EB_ENVIRONMENT_NAME: ${{ vars.EB_ENVIRONMENT_NAME }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Package application
+        run: |
+          zip -r deployment.zip contacts alembic alembic.ini requirements.txt Procfile
+      - name: Upload and deploy application version
+        env:
+          VERSION_LABEL: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          S3_BUCKET="$(aws elasticbeanstalk create-storage-location --query S3Bucket --output text)"
+          S3_KEY="application-versions/${VERSION_LABEL}.zip"
+          aws s3 cp deployment.zip "s3://${S3_BUCKET}/${S3_KEY}"
+          aws elasticbeanstalk create-application-version \
+            --application-name "${EB_APPLICATION_NAME}" \
+            --version-label "${VERSION_LABEL}" \
+            --source-bundle "S3Bucket=${S3_BUCKET},S3Key=${S3_KEY}" \
+            --process
+          aws elasticbeanstalk update-environment \
+            --environment-name "${EB_ENVIRONMENT_NAME}" \
+            --version-label "${VERSION_LABEL}"
+          aws elasticbeanstalk wait environment-updated \
+            --environment-names "${EB_ENVIRONMENT_NAME}" \
+            --version-label "${VERSION_LABEL}"
+      - name: Verify production health
+        run: |
+          set -euo pipefail
+          ENVIRONMENT_URL="$(aws elasticbeanstalk describe-environments \
+            --environment-names "${EB_ENVIRONMENT_NAME}" \
+            --query 'Environments[0].CNAME' --output text)"
+          curl --fail --show-error --silent --retry 12 --retry-delay 10 \
+            --retry-all-errors "http://${ENVIRONMENT_URL}/health/ready"

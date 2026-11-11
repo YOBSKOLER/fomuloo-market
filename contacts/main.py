@@ -5,8 +5,8 @@ from collections.abc import Sequence
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, or_, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, or_, select, text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .db import get_db
@@ -37,6 +37,26 @@ app = FastAPI(
 logger = logging.getLogger(__name__)
 v1_router = APIRouter()
 v2_router = APIRouter()
+
+
+@app.get("/health/live", tags=["health"], include_in_schema=False)
+def health_live() -> dict[str, str]:
+    """Report that the API process is running."""
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", tags=["health"], include_in_schema=False)
+def health_ready(db: Session = Depends(get_db)) -> dict[str, str]:
+    """Report readiness only when the database can answer a simple query."""
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        logger.warning("Readiness check failed because the database is unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporairement indisponible.",
+        ) from exc
+    return {"status": "ok"}
 
 
 @app.exception_handler(Exception)

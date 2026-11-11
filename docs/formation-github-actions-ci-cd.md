@@ -35,8 +35,9 @@ Le workflow `.github/workflows/ci-cd.yml` :
 1. exécute Ruff sur le code applicatif, les tests et les migrations;
 2. exécute les tests avec couverture;
 3. conserve `coverage.xml` comme artefact;
-4. après succès des deux vérifications, déploie sur AWS Elastic Beanstalk quand un
-   commit est poussé sur `main`.
+4. après succès des deux vérifications, déploie automatiquement sur l'environnement
+   Elastic Beanstalk `staging` après un push sur `main`; le déploiement `production` se
+   lance manuellement depuis le workflow avec l'environnement GitHub protégé.
 
 Le fichier `Procfile` démarre l'application ASGI avec Uvicorn sur le port 8000.
 L'archive déployée contient l'application FastAPI, ses dépendances et les migrations
@@ -45,34 +46,42 @@ Alembic, mais pas les tests ni les fichiers locaux de base de données.
 ### Déclenchement et vérification
 
 Sur GitHub, ouvrir **Actions**, sélectionner **CI/CD**, puis consulter les jobs `Lint`,
-`Tests` et, pour un push vers `main`, `Deploy to AWS Elastic Beanstalk`. L'artefact
-`coverage-report` est disponible dans les détails du workflow.
+`Tests`, `Deploy to AWS Elastic Beanstalk (staging)` et éventuellement `Deploy to AWS
+Elastic Beanstalk (production)`. L'artefact `coverage-report` est disponible dans les
+détails du workflow.
 
 Pour tester le workflow sans déployer, ouvrir une pull request vers `main` : seuls
-le lint et les tests s'exécutent. Un push ou une fusion sur `main` lance également
-le job de déploiement.
+le lint et les tests s'exécutent. Un push ou une fusion sur `main` lance aussi le
+déploiement staging. Depuis **Run workflow**, sélectionner `main` et la cible `production`
+pour demander une livraison en production; configurer un reviewer dans l'environnement
+GitHub `production` pour exiger une approbation.
 
 ## Configuration AWS requise avant le premier déploiement
 
-Dans **Settings > Secrets and variables > Actions** du dépôt GitHub :
+Dans **Settings > Environments**, créer `staging` et `production`, et dans les paramètres
+de chaque environnement définir :
 
 | Nom | Type | Contenu |
 | --- | --- | --- |
 | `AWS_ROLE_TO_ASSUME` | Secret | ARN du rôle IAM de déploiement autorisé par le fournisseur OIDC GitHub |
 | `AWS_REGION` | Variable | Région AWS, par exemple `eu-west-3` |
 | `EB_APPLICATION_NAME` | Variable | Nom de l'application Elastic Beanstalk déjà créée |
-| `EB_ENVIRONMENT_NAME` | Variable | Nom de l'environnement Elastic Beanstalk déjà créé |
+| `EB_ENVIRONMENT_NAME` | Variable | Nom de l'environnement Elastic Beanstalk correspondant |
 
-Le rôle IAM doit faire confiance au dépôt GitHub et autoriser uniquement les actions
-Elastic Beanstalk/S3 nécessaires au dépôt d'une version et à la mise à jour de cet
-environnement. Restreindre sa confiance à l'organisation et au dépôt concernés.
+Ajouter un reviewer requis à l'environnement `production` et restreindre les branches
+autorisées à `main`. Le rôle IAM doit faire confiance à l'environnement GitHub concerné
+et autoriser uniquement les actions Elastic Beanstalk/S3 nécessaires au dépôt d'une
+version et à la mise à jour de cet environnement. Restreindre sa confiance au dépôt et
+à l'environnement concernés.
 
-Créer au préalable l'application et l'environnement Elastic Beanstalk sur une plateforme
-Python compatible, puis configurer une base durable (par exemple PostgreSQL géré) et la
-variable d'environnement `DB_URL` dans l'environnement. **Ne pas utiliser SQLite comme
+Créer au préalable l'application et les environnements Elastic Beanstalk staging et
+production sur une plateforme Python compatible, puis configurer une base durable (par
+exemple PostgreSQL géré) et la variable d'environnement `DB_URL` dans chaque
+environnement. **Ne pas utiliser SQLite comme
 base de production** : son fichier local n'est pas une persistance fiable sur les
 instances Elastic Beanstalk. Les identifiants de base doivent rester dans la
-configuration sécurisée AWS, jamais dans le dépôt.
+configuration AWS à accès restreint, idéalement via AWS Secrets Manager, jamais dans le
+dépôt. Appliquer les migrations Alembic avant la première utilisation de chaque base.
 
 Le dépôt local a actuellement son remote `origin` sur GitLab. GitHub Actions ne se
 déclenchera que si le code est aussi présent dans un dépôt GitHub. Le pipeline GitLab
