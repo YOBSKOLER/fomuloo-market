@@ -82,11 +82,18 @@ sur `/docs`.
 
 ```powershell
 python -m pytest --cov=contacts --cov-report=term-missing --cov-report=html
+ruff check --isolated --select E4,E7,E9,F contacts tests alembic
 ```
 
 Les tests utilisent `pytest` et `FastAPI TestClient`, avec une base SQLite temporaire. Le
 pipeline GitLab applique Alembic sur PostgreSQL, lance les tests et conserve les rapports
-Cobertura XML/HTML.
+Cobertura XML/HTML. Le workflow GitHub Actions (`.github/workflows/ci-cd.yml`) lance Ruff
+et pytest sur les push et pull requests; il déploie sur AWS Elastic Beanstalk uniquement
+après un push réussi vers `main`. Voir les [notes de formation CI/CD](docs/formation-github-actions-ci-cd.md)
+pour la configuration AWS requise.
+
+Le remote Git courant est GitLab : GitHub Actions ne s'exécutera que si ce dépôt est
+également publié sur GitHub. Le pipeline GitLab existant reste indépendant.
 
 ## Migrations Alembic
 
